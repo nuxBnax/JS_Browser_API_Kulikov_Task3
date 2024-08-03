@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script src="https://kit.fontawesome.com/0e0ecee46a.js" crossorigin="anonymous"></script>
+	<title>Бесконечная лента с фоттографиями</title>
+	<link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+	<div id="photo-container">
+	</div>
+	<button class="load-btn">Загрузить старые фотки</button>
+	<button class="save-btn">Сохранить изменения</button>
+	<script>
+		const accessKey = "LzuUz9AjbvXzq_Zt0fa48JBHMzA3oidrigOCg3EPAgo";
+
+		let isFetching = true;
+
+		const fetchPhotos = async (page) => { // асинхронные функции всегда возращают промис
+
+			try {
+				const response = await fetch(`https://api.unsplash.com/photos/?page=${page}&client_id=${accessKey}`);
+
+				if (!response.ok) {
+					throw new Error('Ошибка при загрузке данных');
+				}
+				const data = await response.json();
+				return data;
+			}
+			catch {
+				throw error;
+			}
+			finally {
+				isFetching = false;
+			}
+		}
+
+		let currentPage = 1;
+		const photoContainer = document.querySelector('#photo-container');
+
+		async function run() {
+			try {
+				const data = await fetchPhotos(currentPage);
+				console.log(data);
+				addDataToLocalStorage(data);
+				addPhotoinHTML('data');
+
+			} catch (error) {
+				const errorMessage = document.createElement("div");
+				errorMessage.textContent = error.message;
+				photoContainer.append(errorMessage);
+			}
+
+		}
+		run();
+
+		function addDataToLocalStorage(data) {
+			const photos = [];
+
+			for (let obj of data) {
+				const photo = {
+					id: obj.id,
+					url: obj.urls.small,
+					author: obj.user.name,
+					description: obj.alt_description,
+					likes: obj.likes,
+					user_like: false
+				}
+				photos.push(photo);
+			}
+			localStorage.setItem('data', JSON.stringify(photos));
+		}
+
+		function addPhotoinHTML(data) {
+			const dataFromLS = JSON.parse(localStorage.getItem(data));
+			for (let i = 0; i < dataFromLS.length; i++) {
+				const photo = dataFromLS[i];
+				photoContainer.insertAdjacentHTML('beforeend', `
+					<div class="photo">
+						<img src="${photo.url}" alt="${photo.description}">
+						<h2 class="photo__author">${photo.author}</h2>
+						<div class="photo__box">	
+							<button data-id="${photo.id}" data-key="${data}"  class="photo__like-btn">Like</button>
+							<div class="photo__like-box" data-user_like="${photo.user_like}">		
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="grey">
+									<path d="M313.4 32.9c26 5.2 42.9 30.5 37.7 56.5l-2.3 11.4c-5.3 26.7-15.1 52.1-28.8 75.2l144 0c26.5 0 48 21.5 48 48c0 18.5-10.5 34.6-25.9 42.6C497 275.4 504 288.9 504 304c0 23.4-16.8 42.9-38.9 47.1c4.4 7.3 6.9 15.8 6.9 24.9c0 21.3-13.9 39.4-33.1 45.6c.7 3.3 1.1 6.8 1.1 10.4c0 26.5-21.5 48-48 48l-97.5 0c-19 0-37.5-5.6-53.3-16.1l-38.5-25.7C176 420.4 160 390.4 160 358.3l0-38.3 0-48 0-24.9c0-29.2 13.3-56.7 36-75l7.4-5.9c26.5-21.2 44.6-51 51.2-84.2l2.3-11.4c5.2-26 30.5-42.9 56.5-37.7zM32 192l64 0c17.7 0 32 14.3 32 32l0 224c0 17.7-14.3 32-32 32l-64 0c-17.7 0-32-14.3-32-32L0 224c0-17.7 14.3-32 32-32z"/></svg>
+								<p class="photo__like-total">${photo.likes}</p>
+							</div>
+						</div>
+					</div>
+				`)
+			}
+		}
+
+		const likeBtn = document.querySelector(".photo__like-btn");
+
+		photoContainer.addEventListener('click', ({ target }) => {
+			const dataKey = target.getAttribute('data-key');
+			let dataFromLS = JSON.parse(localStorage.getItem(dataKey));
+
+			for (let i = 0; i < dataFromLS.length; i++) {
+				const photo = dataFromLS[i];
+				const dataId = target.getAttribute('data-id');
+				if (photo.id === dataId) {
+					photo.likes++;
+					photo.user_like = true;
+
+					const parentEl = target.parentElement;
+					const totalLikesEl = parentEl.querySelector('.photo__like-total');
+					const svgEl = parentEl.querySelector('svg');
+
+					totalLikesEl.textContent = photo.likes;
+					totalLikesEl.style.color = "blue";
+					totalLikesEl.style.fontSize = "23px";
+					svgEl.style.fill = "darkgreen";
+				}
+			}
+			localStorage.setItem(dataKey, JSON.stringify(dataFromLS));
+		});
+
+
+		const saveBtn = document.querySelector(".save-btn");
+
+		// Функция записывает новые данные в локальное хранилище под новым ключем
+		saveBtn.addEventListener('click', () => {
+			const likeBtn = document.querySelector(".photo__like-btn");
+			const dataKey = likeBtn.getAttribute('data-key');
+			const dataFromLS = JSON.parse(localStorage.getItem(dataKey));
+
+			console.log(localStorage.getItem('history'));
+			if (!localStorage.getItem('history')) {
+				localStorage.setItem('history', JSON.stringify(dataFromLS));
+				alert("Данные сохранены!");
+			} else {
+				if (dataKey === 'history') {
+					alert("Если вы загрузили старые фотографии и вносите изменения, то они сохраняются автоматически!");
+				}
+				else if (dataKey === 'data') {
+					let confirmation = confirm('Вы уверены что хотите сохранить? Старые записи будут утеряны!')
+					console.log(confirmation);
+					if (confirmation === false) {
+						return;
+					}
+					localStorage.setItem('history', JSON.stringify(dataFromLS));
+					alert("Данные сохранены!");
+				}
+			}
+		});
+
+		const loadBtn = document.querySelector(".load-btn");
+
+		// Функция извлекает записанные ранее данные из локального хранилища
+		loadBtn.addEventListener('click', () => {
+			if (!localStorage.getItem('history')) {
+				alert('Вы пока ничего не сохранили! Сохраните для начала изменения а после попытайтесь снова!');
+				location.reload();
+			}
+			photoContainer.innerHTML = "";
+			addPhotoinHTML('history');
+			let dataFromLS = JSON.parse(localStorage.getItem('history'));
+
+			const likeBoxes = document.querySelectorAll('.photo__like-box');
+			likeBoxes.forEach(item => {
+				const dataUserLike = item.getAttribute('data-user_like');
+				if (dataUserLike === 'false') {
+					return
+				}
+				const svgEl = item.querySelector('svg');
+				const totalLikesEl = item.querySelector('.photo__like-total');
+
+				totalLikesEl.style.color = "blue";
+				totalLikesEl.style.fontSize = "23px";
+				svgEl.style.fill = "darkgreen";
+			});
+
+		});
+	</script>
+</body>
+
+</html>
